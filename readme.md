@@ -1,6 +1,9 @@
 # 克苏苏岛行动
 
-**战斗
+## 作品链接
+
+链接：https://pan.baidu.com/s/1aVZ-oJgN0G57zWOiZ1MoqA 
+提取码：zjfp
 
 ## 目录
 
