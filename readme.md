@@ -2,6 +2,8 @@
 
 ## 作品链接
 
+只可在 windows 下运行。
+
 链接：https://pan.baidu.com/s/1f_CvuXodJJShDn7UovcACg 
 提取码：v6nn
 
