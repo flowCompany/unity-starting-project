@@ -2,8 +2,8 @@
 
 ## 作品链接
 
-链接：https://pan.baidu.com/s/1aVZ-oJgN0G57zWOiZ1MoqA 
-提取码：zjfp
+链接：https://pan.baidu.com/s/1f_CvuXodJJShDn7UovcACg 
+提取码：v6nn
 
 ## 目录
 
@@ -42,7 +42,7 @@
 
 ## 程序结构
 
-![](readmepic/structure.png)
+![](readmepic/克苏苏岛行动架构设计.jpg)
 
 游戏分为四种场景——剧情场景、移动场景、战斗准备场景以及战斗场景，同一时刻处于一种场景之中。
 

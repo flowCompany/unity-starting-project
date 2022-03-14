@@ -23,6 +23,7 @@ public class main_status : MonoBehaviour
     private HashSet<int> chosenMovingCids;
     private story _story;
     private Combact combact;
+    public eventFormatSystem eventFormatSystem;
     // Start is called before the first frame update
     void Start()
     {
@@ -135,7 +136,7 @@ public class main_status : MonoBehaviour
     }
     public void startCombactFromStory(int combactId)
     {
-        combact.enterIntoCombactReady(combactId);
+        combact.enterIntoCombact(combactId);
         isStopMoving = false;
         setsceneID(3, "", "mainStatus.startCombactFromStory");
     }

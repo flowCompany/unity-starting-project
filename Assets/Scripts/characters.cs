@@ -11,6 +11,7 @@ public class characters : MonoBehaviour
     {
         public int taskID;
         public int CharID;
+        public Vector3 Target;
         public string extra;
     }
     public class CharacterObject
@@ -31,12 +32,12 @@ public class characters : MonoBehaviour
             public Vector3 FinalTarget;   //最终目标点
             public bool IsInway;     //是否到达目标点
 
-            public Queue<eventFormatSystem.eventFormatPoint> AttackedQueue = new Queue<eventFormatSystem.eventFormatPoint>();
+            public SortedSet<int> AttackedQueue = new SortedSet<int>();
             public int status;   //动作状态
             public CharacterData(ref int num, ref CharacterType charType, ref int curtime, ref int owner, ref Vector3 finaltarget)
             {
                 HP = charType.HP; FreeTime = curtime;Inprocess = false; task = null; ATKIdx = -1; death = false; Owner = owner; dataIdx = num;
-                FinalTarget = finaltarget; status = 0; vaild = true; CurTarget = finaltarget;
+                FinalTarget = Vector3.down; status = 0; vaild = true; CurTarget = Vector3.down;
             }
         }
         public class CharacterType
@@ -103,11 +104,33 @@ public class characters : MonoBehaviour
             }
         }
 
+        /// <summary>
+        /// 经 joy 考虑，将 idx 暂时取消
+        /// </summary>
+        /// <param name="idx"></param>
         public void PopEvent(int idx)
         {
-            eventFormatSystem.eventFormatPoint evp = data.AttackedQueue.Dequeue();
-            if (idx != evp.Idx)
-                Debug.Log("evp Is Error,charidx is " + idx + "evpidx is " + evp.Idx);
+            var i = data.AttackedQueue.GetEnumerator();
+            i.MoveNext();
+            int firstKey = i.Current;
+            data.AttackedQueue.Remove(firstKey);
+            //eventFormatSystem.eventFormatPoint evp = data.AttackedQueue.Dequeue();
+            //if (idx != evp.Idx)
+            //    Debug.Log("evp Is Error,charidx is " + idx + "evpidx is " + evp.Idx);
+        }
+
+        public bool arriveTarget()
+        {
+            Debug.LogFormat("arriveTarget:CurTarget is {0}", data.CurTarget);
+            if (data.CurTarget == Vector3.down) return true;
+            if ((data.CurTarget - obj.transform.position).magnitude < common.arriveTargetEps) return true;
+            return false;
+        }
+
+        public void removeTask()
+        {
+            data.task = null;
+            SetAnimatorStatus(obj.GetComponent<Animator>(),common.Animator_Nothing);
         }
 
         public bool bothOwner(CharacterObject charA)
@@ -121,7 +144,7 @@ public class characters : MonoBehaviour
             //刷新最后空闲时间
             data.FreeTime = main_status.currentFrame;
             //调整角度为对应单位方向
-            SetRotationToMove(data.CurTarget);
+            SetRotationToMove(data.task.Target);
             //执行动画效果
             SetAnimatorStatus(obj.GetComponent<Animator>(), common.Animator_IsAttack);
         }
@@ -152,15 +175,16 @@ public class characters : MonoBehaviour
             //执行动画效果
             //更新血条
             slider.GetComponent<Slider>().value = 100.0F * data.HP / type.HP;
-            Debug.LogFormat("call updateHp,num is {0},slider.value is {1}", num, slider.GetComponent<Slider>().value);
+            Debug.LogFormat("{2}:call updateHp,num is {0},slider.value is {1}", num, slider.GetComponent<Slider>().value, main_status.currentFrame);
             //检测有无死亡
             if (data.HP == 0)
             {
+                Debug.Log("SomeOne dead");
                 data.death = true;
                 //执行倒地动画
                 SetAnimatorStatus(obj.GetComponent<Animator>(), common.Animator_IsDie);
                 //传递死亡事件，回收变量
-
+                
                 return true;
             }
             return false;
@@ -254,6 +278,16 @@ public class characters : MonoBehaviour
                    }
                }
         */
+        public void moveByTask(Vector3 target, float speed = 1.0F)
+        {
+            data.task = new Task
+            {
+                taskID = common.Task_Moving,
+                Target = target
+            };
+            move(speed);
+        }
+
         public void moveToTarget(Vector3 target,float speed = 1.0F)
         {
             data.CurTarget = target;
@@ -264,27 +298,30 @@ public class characters : MonoBehaviour
         {
             data.task = new Task
             {
-                taskID = common.Task_Moving
+                taskID = common.Task_Moving,
+                Target = data.CurTarget
             };
+            move(speed);
+        }
+
+        public void move(float speed = 1.0F)
+        {
             Animator ani = obj.GetComponent<Animator>();
             ani.speed = speed;
-            moveByAnimator(ani, data.CurTarget);
+            moveByAnimator(ani, data.task.Target);
         }
 
         public void moving()
         {
-            Vector3 distance = data.CurTarget - obj.transform.position;
+            Vector3 distance = data.task.Target - obj.transform.position;
 
             float singleStep = type.moveSpeed * Time.deltaTime;
-
-      //      Vector3 newDirection = Vector3.RotateTowards(obj.transform.forward, distance, singleStep, 0.0f);
-     //       obj.transform.rotation = Quaternion.LookRotation(newDirection);
 
             Vector3 deltaV = distance.normalized *
                 type.moveSpeed * Time.deltaTime;
             //Debug.LogFormat("{0} is moving,moving delta is {1} {2} {3} {4}", data.dataIdx, deltaV.magnitude, distance.normalized, type.moveSpeed, Time.deltaTime);
 
-            if (deltaV.magnitude > (data.CurTarget - obj.transform.position).magnitude)
+            if (deltaV.magnitude > (data.task.Target - obj.transform.position).magnitude)
             {
                 Debug.Log("Thats bug");
                 obj.transform.position = data.CurTarget;
@@ -315,7 +352,6 @@ public class characters : MonoBehaviour
         {
             animator.SetBool("IsMove", true);
         }
-
         public void UnMoveAmination(Animator animator)
         {
             animator.SetBool("IsMove", false);
@@ -329,7 +365,6 @@ public class characters : MonoBehaviour
             }
             return false;
         }
-
         public double distanceTo(ref CharacterObject atkObj)
         {
             double xdis = (obj.transform.position.x - atkObj.obj.transform.position.x);
@@ -337,10 +372,7 @@ public class characters : MonoBehaviour
             double zdis = (obj.transform.position.z - atkObj.obj.transform.position.z);
             return Math.Sqrt(xdis * xdis + zdis * zdis);
         }
-
-        
     }
-
 
     public void Init(Canvas paracanvas,Canvas paracanvaswithcamera)
     {
@@ -355,18 +387,29 @@ public class characters : MonoBehaviour
     /**********角色单位相互作用**********/
     public void CharAAttackCharB(int CharAidx, int CharBidx)
     {
+        Debug.LogFormat("Character Attack:Character {0} attack character {1}", CharAidx, CharBidx);
         //挂载idx编号Obj受到伤害事件
         eventFormatSystem.eventAttack eveAttack = new eventFormatSystem.eventAttack(charObjList[CharAidx].type.ATK);
         string jsonAttack = JsonConvert.SerializeObject(eveAttack);
-        eventFormatSystem.eventFormat eve = new eventFormatSystem.eventFormat(CharAidx, CharBidx, common.EVENT_ATTACK, jsonAttack);
-        eventFormatSystem.eventFormatPoint evp = evc.AddEventByFrame(eve, charObjList[CharAidx].type.hurtSpeed);
-        
-        charObjList[CharBidx].data.AttackedQueue.Enqueue(evp);
+        eventFormatSystem.EventFormat eve = new eventFormatSystem.EventFormat(CharAidx, CharBidx, common.EVENT_ATTACK, jsonAttack);
+        evc.AddEventByTime(eve, charObjList[CharAidx].type.hurtSpeed / 120f);
+
+        charObjList[CharAidx].data.task = new Task
+        {
+            taskID = common.Task_Attack,
+            CharID = CharBidx,
+            Target = charObjList[CharBidx].obj.transform.position
+        };
+
+        //charObjList[CharBidx].data.AttackedQueue.Enqueue(evp);
         charObjList[CharBidx].BeAttacked(CharAidx);
         charObjList[CharAidx].DoAttack();
+
+        Debug.Log("Time: " + new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds());
     }
     public bool CharBinCharAATKRange(CharacterObject charA, CharacterObject charB)
     {
+        Debug.LogFormat("CharBinCharAATKRange: {0},{1} dis is {2},ATKRange is {3}", charA.type.ID, charB.type.ID, distanceTo(charA, charB), charA.type.ATKRange);
         if (distanceTo(charA,charB) <= charA.type.ATKRange) return true;
         return false;
     }
@@ -376,7 +419,11 @@ public class characters : MonoBehaviour
         if (distanceTo(charA, charB) <= charA.type.alertRange) return true;
         return false;
     }
-
+    public bool charIsDie(int charIdx)
+    {
+        if (charObjList[charIdx].data.death) return true;
+        return false;
+    }
     public double distanceTo(CharacterObject charA,CharacterObject charB)
     {
         double xdis = (charA.obj.transform.position.x - charB.obj.transform.position.x);
@@ -399,6 +446,12 @@ public class characters : MonoBehaviour
 
     public List<CharacterObject.CharacterType> characterList;
     public List<CharacterObject> charObjList = new List<CharacterObject>();
+
+    public void Start()
+    {
+        evc = eventFormatSystem.newEventController(this);
+    }
+
     public void InitCharacters(string id)
     {
         var textFile = Resources.Load<TextAsset>("characters/maps/" + id);
@@ -611,16 +664,6 @@ public class characters : MonoBehaviour
 
     }
 
-    private eventFormatSystem.eventController evc;
-
-    private int MouseCharID = -1;
-    [HideInInspector]
-    public GameObject MouseChar = null;
-    private GameObject buttonfriend, buttonenemy;
-    private GameObject sliderFriend, sliderEnemy;
-    private Canvas canvasWithCamera;
-    private Canvas canvas;
-
     // Begin: 下面处理统一移动逻辑
 
     public void togetherMoveOrder(Vector3 targetPosition, List<int> characterIds)
@@ -722,4 +765,15 @@ public class characters : MonoBehaviour
         }
     }
     // End: 上方是统一移动逻辑
+
+    public eventFormatSystem eventFormatSystem;
+    public eventFormatSystem.eventController evc;
+
+    private int MouseCharID = -1;
+    [HideInInspector]
+    public GameObject MouseChar = null;
+    private GameObject buttonfriend, buttonenemy;
+    private GameObject sliderFriend, sliderEnemy;
+    private Canvas canvasWithCamera;
+    private Canvas canvas;
 }

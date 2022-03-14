@@ -9,16 +9,14 @@ using UnityEngine;
 public class TimeQueue
 {
     SortedDictionary<float, List<Action>> tsQueue = new SortedDictionary<float, List<Action>>();
-    float nowTime = 0f;
-    float fakeTime = 0;
+    float nowTime = 0f; //单位为 sec
+    float fakeTime = 0; //单位为 sec
 
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
+    /// <summary>
+    /// TimeQueue 并不是一个 monoBehavior，但他也必须每帧调用 Update()
+    /// Update() 中包括判断当前帧有无活动，以及处理当前帧的行进速度
+    /// ！！！你只能在有且仅有一处调用 Update()
+    /// </summary>
     public void Update()
     {
         nowTime += Time.deltaTime;

@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -29,6 +30,7 @@ public class Combact : MonoBehaviour
         //Debug.Log("combact energy: " + energy);
         if (mstatus.CheckSID(common.Combact_Scene,"","combact_update"))
         {
+            main_status.currentFrame++;
             TaskTree();
             CharacterProcess();
             return;
@@ -49,6 +51,7 @@ public class Combact : MonoBehaviour
     {
         foreach (characters.CharacterObject character in characters.charObjList)
         {
+            if (character.data.death) continue;
             if (character.data.Inprocess)//1.正在执行任务
             {
                 
@@ -60,6 +63,8 @@ public class Combact : MonoBehaviour
                     switch (character.data.task.taskID)
                     {
                         case common.Task_Attack: //2.1 最高优先级：执行任务
+                            if (character.data.task.CharID != -1 &&characters.charIsDie(character.data.task.CharID)) // 目前没做好死亡时向攻击队列发送消息只能采取主动查询
+                                break;
                             continue;
                         case common.Task_Alert:  //警戒范围内得判断有无更近的敌方单位
                             break;
@@ -76,8 +81,7 @@ public class Combact : MonoBehaviour
                 for (int i = 0; i < characters.charObjList.Count; i++)
                 {
                     //单位存活且不属于同意阵营
-                    if (characters.charObjList[i].data.death == true || (characters.charObjList[i].data.vaild == false)||
-                        (character.bothOwner(characters.charObjList[i]))) continue;
+                    if (characters.charIsDie(i)||character.bothOwner(characters.charObjList[i])) continue;
                     double dis = characters.distanceTo(character, characters.charObjList[i]);
                     if (characters.distanceTo(character, characters.charObjList[i]) < ATKRange)
                     {
@@ -85,27 +89,38 @@ public class Combact : MonoBehaviour
                             ATKRange = dis;
                     }
                 }
+
+                Debug.LogFormat("calculate AtkIdx:{0} atkIdx is {1}", character.data.dataIdx, ATKIdx);
                 //2.2 攻击范围之内
                 if (ATKIdx != -1 && characters.CharBinCharAATKRange(character, characters.charObjList[ATKIdx]))
                 {
-                    if (character.data.FreeTime + character.type.ATKSpeed > main_status.currentFrame)
-                        continue;
-
-                    if (characters.charObjList[ATKIdx].data.death)
-                    {
-                        Debug.LogError("编号" + ATKIdx + "的对象死亡，角色应更换攻击目标");
-                        continue;
-                    }
                     characters.CharAAttackCharB(character.data.dataIdx, ATKIdx);
+                    //character.data.task = new characters.Task
+                    //{
+                    //    taskID = common.Task_Attack,
+                    //    CharID = ATKIdx,
+                    //    Target = characters.charObjList[ATKIdx].obj.transform.position
+                    //};
+
+                    //Action attactAction = () =>
+                    //{
+                    //    characters.CharAAttackCharB(character.data.dataIdx, ATKIdx);
+                    //};
+                    //Debug.LogFormat("{0} is attacked", ATKIdx);
+                    //characters.evc.AddEventByTime(attactAction, character.type.ATKSpeed / 120f * 3f);
                 }
                 else if (ATKIdx != -1 && characters.CharBinCharAAlertRange(character, characters.charObjList[ATKIdx]))//2.3 警戒范围之内
                 {
                     Debug.Log("is trying attack: " + character.type.ID);
-                    character.moveToTarget(characters.charObjList[ATKIdx].obj.transform.position);
+                    character.moveByTask(characters.charObjList[ATKIdx].obj.transform.position);
                 }
-                else //2.4移动到目标地点
+                else if(!character.arriveTarget())//2.4移动到目标地点
                 {
-
+                    character.moveToTarget(character.data.CurTarget);
+                }
+                else
+                {
+                    character.removeTask();
                 }
             }
         }
@@ -116,16 +131,27 @@ public class Combact : MonoBehaviour
         Debug.LogFormat("characters.charObjList length is {0}", characters.charObjList.Count);
         foreach (characters.CharacterObject character in characters.charObjList)
         {
-            if(character.data.task == null)
+            if (character.data.death) continue;
+            if (character.data.task == null)
             {
-                Debug.LogFormat("{0}th character have no task", character.data.dataIdx);
+                Debug.LogFormat("TaskId:{0}th character have no task", character.data.dataIdx);
                 continue;
             }
-            Debug.LogFormat("{0}th character taskId is {1}", character.data.dataIdx, character.data.task.taskID);
+            Debug.LogFormat("TaskId:{0}th character taskId is {1}", character.data.dataIdx, character.data.task.taskID);
             switch (character.data.task.taskID)
             {
                 case common.Task_Moving:
                     character.moving();
+                    break;
+                case common.Task_Attack:
+                    //Debug.LogFormat("character.data.FreeTime:{0},character.type.ATKSpeed:{1}", character.data.FreeTime, character.type.ATKSpeed);
+                    //if (character.data.FreeTime + character.type.ATKSpeed > main_status.currentFrame) break;
+                    //if (characters.charObjList[character.data.task.CharID].data.death)
+                    //{
+                    //    Debug.LogError("编号" + character.data.task.CharID + "的对象死亡，角色应更换攻击目标");
+                    //    continue;
+                    //}
+                    //characters.CharAAttackCharB(character.data.dataIdx, character.data.task.CharID);
                     break;
                 default:
                     Debug.LogWarningFormat("{0}th character taskId is {1}", character.data.dataIdx, character.data.task.taskID);
@@ -154,10 +180,16 @@ public class Combact : MonoBehaviour
     
     
 
-    public void enterIntoCombact()
+    public void enterIntoCombact(int combactId)
     {
         mstatus.setsceneID(common.Combact_Scene, "", "combact_enterIntoCombact");
+        characters.loadCharacterlists();
+
         combactTimeQueue.addActionafter(0.1f, combactTimeQueue.addEnergyAction);
+
+        combactList.loadCombact(combactId);
+
+        inputController.loadCombactUI();
         return;
     }
 
@@ -216,4 +248,8 @@ public class Combact : MonoBehaviour
      * End: 处理每秒加能量（费）的逻辑
      */
 
+    public void onSomeOneDead()
+    {
+
+    }
 }

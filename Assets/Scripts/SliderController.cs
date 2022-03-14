@@ -20,6 +20,11 @@ public class SliderController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (father == null)
+        {
+            GameObject.Destroy(gameObject);
+            return;
+        }
         var col = father.GetComponent<Collider>();
         var topAhcor = new Vector3(col.bounds.center.x, col.bounds.max.y, col.bounds.center.z);
         var viewPos = Camera.main.WorldToViewportPoint(topAhcor); //得到视窗坐标

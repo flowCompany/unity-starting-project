@@ -129,7 +129,7 @@ public class input_controller : MonoBehaviour
     public void CombactCanvasEnterCombactClick()
 	{
 		Debug.Log("CombactCanvasAttackClick is called");
-		combact.enterIntoCombact();
+		combact.enterIntoCombact(0);
 	}
 	public void CombactCanvasEnterCombactReadyClick()
 	{
